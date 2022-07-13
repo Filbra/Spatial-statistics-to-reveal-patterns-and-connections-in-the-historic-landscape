@@ -1,0 +1,305 @@
+---
+title: "Revealing patterns and connections in the historic landscape of the northern Apennines (Vetto, Italy)"
+authors: "Filippo Brandolini, Sam Turner"
+date: "14/12/2021"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r setup, include=FALSE}
+library(yaml)
+library(markdown)
+library(knitr)
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+---
+
+NOTES:
+
+The plotted figures and .txt files are saved in the 'Output' folder.
+
+---
+
+## Load Libraries
+```{r echo=FALSE, results='hide', include=FALSE}
+
+LibPack<-c("raster","spatstat","rgdal","rgeos","maptools","sp","MASS","sf","spdep","tmap","units", "Matrix","here")
+
+lapply(LibPack, require, character.only=TRUE)
+```
+The following libraries were loaded: 'LibPack'.
+
+
+#################################################################################
+## Part 1) LICD application in Landscape Archaeology (from Carrer et al. 2021) ##
+#################################################################################
+
+```{r results='hide'}
+
+### Historic Landscape Characterization - Vetto (Italy)
+
+### !! YOUR_PATH --> Depending where you downloaded the .zip folder, correct the path to retrieve the files. !!
+
+# Considering only the HLC periodisation:
+
+  hlc <- here("C:/YOUR_PATH/EsriSHP/hlc/HLC_periods.shp") %>%
+  st_read()
+
+## Create ordered factor
+
+  hlc$class <- ifelse(hlc$Period %in% c("1950s","1970s","2000s","2010s"), hlc$Period, "<1950s")
+  hlc$class <- ordered(hlc$class, levels=c("2010s","2000s","1970s","1950s","<1950s"))
+
+# ## Considering only the HLC types:
+#   hlc <- here("C:/YOUR_PATH/HLC_HiLSS/EsriSHP/hlc/HLC_types.shp") %>%
+#   st_read()
+# 
+#   hlc$class <- ifelse(hlc$CLASS_bt_2 %in% c("Irregular Field","Combined Field",
+#                                           "Nucleated Settlement"), hlc$CLASS_bt_2, "Others")
+#   hlc$class <- ordered(hlc$class, levels=c("Irregular Field","Combined Field",
+#                                          "Nucleated Settlement","Others"))
+```
+
+```{r echo=FALSE, results='hide'}
+## Plot Map classes - TIFF
+
+HLC_map <- tm_shape(hlc) +
+  
+  ## !! Change the title according to the data considered !! ##
+  
+  tm_fill("class", palette="viridis", title="HLC / Periods") +
+  #tm_fill("class", palette="viridis", title="HLC / Types") +
+  tm_compass(position=c("left", "bottom")) + 
+  tm_scale_bar(breaks=c(0, 1, 2), position=c(0.7, 0.00001))
+HLC_map
+dev.off()
+```
+
+```{r results='hide'}
+jpeg("Output/LICD_Periods/Vetto_hlc_Periods.jpeg", width=15, height=15, units="cm", res=300)
+
+#jpeg("Output/LICD_Types/Vetto_hlc_Types.jpeg", width=15, height=15, units="cm", res=300)
+
+HLC_map
+dev.off()
+```
+
+```{r echo=FALSE, out.width="100%", fig.cap="*HLC & LICD*", fig.align='center'}
+
+knitr::include_graphics("Output/LICD_Periods/Vetto_hlc_Periods.jpeg")
+
+#knitr::include_graphics("Output/LICD_Types/Vetto_hlc_Types.jpeg")
+
+```
+
+```{r results='hide'}
+## Create neighbours
+nb1 <- poly2nb(hlc, snap=4, row.names=as.character(hlc$UID))
+hlc.nb <- nblag(nb1, 4) ## higher orders
+hlc.mat <- as(nb2listw(nblag_cumul(hlc.nb), style="B"), "CsparseMatrix")
+```
+
+```{r results='hide'}
+## Join-Count Statistics
+
+jc.hlc <- vector(mode="list", length=length(hlc.nb))
+jc.hlc.p <- vector(mode="list", length=length(hlc.nb))
+
+for (i in 1:length(hlc.nb)) {
+  jc.hlc[[i]] <- joincount.multi(hlc$class, nb2listw(hlc.nb[[i]]))
+  jc.hlc.p[[i]] <- pnorm(jc.hlc[[i]][,4], lower.tail=FALSE)
+}
+```
+
+```{r results='hide'}
+# For higher-order neighbour weight
+
+#### STEP 1: local composition
+(p <- as.matrix(summary(hlc$class))/nrow(hlc)) #probabilities of each "type"
+areas <- aggregate(st_area(hlc), list(hlc$class), sum)
+areas$x <- set_units(areas$x, "km2")
+areas$props <- drop_units(areas$x/sum(areas$x))
+areas
+
+adata <- as.numeric(hlc$class) #factor no longer necessary, now numeric
+
+source("local_JC0.R")
+
+res <- local_JC0(obj=hlc, lagsmat=hlc.mat, varname="class", numvar=adata, p=p)
+local_comp <- res[[1]]
+JC.pvalue_seq <- res[[2]]
+```
+
+```{r results='hide'}
+#### STEP 2: local configuration
+
+local_config <- matrix(0,length(adata),1)
+colnames(local_config) <- c("cluster-dispersion")
+
+for (j in 1:length(adata)){#for cluster is 1, for dispersion -1, otherwise 0
+  if (min(JC.pvalue_seq[j,])<1-(1-0.05)^(1/3)){ ###CHANGE
+    ifelse(which(JC.pvalue_seq[j,]==min(JC.pvalue_seq[j,]), arr.ind = T)==1,local_config[j]<- 1, ifelse(which(JC.pvalue_seq[j,]==min(JC.pvalue_seq[j,]), arr.ind = T)==3,local_config[j]<- -1, local_config[j] <- 0))
+  } # clump 1,dispersion -1, other 0
+}
+
+# Combination of local composition and local configuration
+Type <- character(length=length(adata))
+C <- cbind(local_comp, local_config)
+for (i in 1:length(adata)){
+  ifelse(C[i,1] == 1 && C[i,2] == 1, Type[i] <- "Cluster",
+         ifelse(C[i,1] == 1 && C[i,2] == 0, Type[i] <- "Clump",
+                ifelse(C[i,1] == -1 && C[i,2] == 0, Type[i] <- "Outlier",
+                       ifelse(C[i,1] == 0 && C[i,2] == -1, Type[i] <- "Dispersed",
+                              ifelse(C[i,1] == -1 && C[i,2] == -1, Type[i] <- "Outlier in dispersion area",
+                                     Type[i] <- "No cluster")))))
+}
+```
+
+```{r echo=FALSE, results='hide'}
+# Plot LICD
+Type1 <-  Type
+hlc$Type <- Type
+is.na(Type1) <- Type1 == "No cluster"
+hlc$Type1 <- factor(Type1)
+LICD_map <- tm_shape(hlc) + 
+  tm_fill("Type1", palette="viridis", title="LICD/HLC Periods", textNA="No cluster") +  # !! check the title !! #
+  tm_compass(position=c("left", "bottom")) + 
+  tm_scale_bar(breaks=c(0, 1, 2), position=c(0.7, 0.00001)) 
+jpeg("Output/LICD_Periods/Vetto_LICD.jpeg", width=15, height=15, units="cm", res=300)
+#jpeg("Output/LICD_Types/Vetto_LICD.jpeg", width=15, height=15, units="cm", res=300)
+LICD_map
+dev.off()
+```
+
+```{r echo=FALSE, out.width="100%", fig.cap="*HLC & LICD*", fig.align='center'}
+knitr::include_graphics("Output/LICD_Periods/Vetto_LICD.jpeg")
+#knitr::include_graphics("Output/LICD_Types/Vetto_LICD.jpeg")
+```
+
+```{r echo=FALSE, results='hide'}
+# HLC & LICD
+
+both <- LICD_map + tm_facets("class", nrow=1)
+
+jpeg("Output/LICD_Periods/Vetto_HLC_LICD.jpeg",width=45,height=10,units="cm",res=300)
+
+#jpeg("Output/LICD_Types/Vetto_HLC_LICD.jpeg",width=45,height=10,units="cm",res=300)
+
+both
+
+dev.off()
+
+```
+
+```{r echo=FALSE, out.width="100%", fig.cap="*HLC & LICD*", fig.align='center'}
+
+knitr::include_graphics("Output/LICD_Periods/Vetto_HLC_LICD.jpeg")
+
+#knitr::include_graphics("Output/LICD_Types/Vetto_HLC_LICD.jpeg")
+```
+
+###################################
+## Part 2) POINT PATTERN ANALYSIS##
+###################################
+
+## Load Data
+```{r results='hide'}
+
+# Topographic variable: Geomorphons
+
+geomorph <- raster("GeoTiff/geomorphon.tiff")
+
+# Fields Eu distances
+
+cf_dist <- raster("GeoTiff/cf_eu_dist.tiff")
+if_dist <- raster("GeoTiff/if_eu_dist.tiff")
+
+# Historical sites (HSs)
+# sites <- remove.duplicates(readOGR(dsn="EsriSHP/h_sites", layer="h_sites"))
+
+# # Abandoned rural buildings (ABSs)
+sites <- remove.duplicates(readOGR(dsn="EsriSHP/rural_ruins", layer="rural_ruins"))
+
+# Region Of Interest (ROI)
+prj_area <- readOGR(dsn="EsriSHP/roi", layer="roi")
+
+# Setting the working region
+region<-as(as(prj_area,"SpatialPolygons"),"owin")
+
+# Converting  site locations to point pattern process (ppp)
+sites_ppp<- as.ppp(coordinates(sites), region)
+
+# Save files loaded into R ####
+
+save(cf_dist, if_dist, geomorph, sites, prj_area, file="PPA_Data.RData")
+
+# Number of Simulations
+NuSim <- 999
+
+```
+
+
+
+## Spatial Covariates
+
+```{r echo=FALSE, results='hide'}
+
+# Convert covariates to objects of class image and create list
+
+covar<-list(CF=as.im(as(cf_dist,"SpatialGridDataFrame")),
+            IF=as.im(as(if_dist,"SpatialGridDataFrame")),
+            Geo=as.im(as(geomorph,"SpatialGridDataFrame")))
+```
+
+## Parametric analysis
+
+## First-order properties
+
+## !! substitute site_h_ppp and site_h with sites_r_ppp and sites_r to perform PPA with the rural ruins !! ##
+
+```{r results='hide', warning=FALSE}
+
+# Model 0: homogeneous point process - Null model
+
+mod_0<- ppm(sites_ppp ~ 1)
+
+# Model 1: parametric inhomogeneous point process - Topographic variables
+
+mod_1<- ppm(sites_ppp, ~ Geo + CF + IF, data = covar)
+
+# Bayesian Information Criterion (BIC): stepwise variable selection
+
+mod_1BIC<-stepAIC(mod_1,k=log(length(sites)))
+
+# Exporting Tables
+
+# Create PPM lists
+
+ppp_models<-list(model0=mod_0,model1=mod_1BIC)
+
+# Export PPM summary
+
+write.table(capture.output(print(ppp_models)),file="Output/PPA/PPP_Models.txt")
+
+# Compare BIC scores for the different models
+
+n_BIC<-lapply(ppp_models,BIC)
+write.table(n_BIC,file="Output/PPA/BIC_Models_scores.txt")
+
+# BIC weight for different models (Credits: dr. Francesco Carrer, Newcastle University)
+
+AIC.BIC.weight<-function(x){
+  for(i in 1:length(x)){
+    x.vect<-as.numeric(c(x[1:i]))}
+  delta<-x.vect-min(x.vect)
+  L<-exp(-0.5*delta)
+  result<-round(L/sum(L),digits=7)
+  return(result)
+}
+```
+
+```{r echo=FALSE}
+write.table(AIC.BIC.weight(n_BIC[1:2]),file="Output/PPA/BIC_Models01_weights.txt")
+```
