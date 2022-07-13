@@ -1,7 +1,7 @@
 # Spatial-statistics-to-reveal-patterns-and-connections-in-the-historic-landscape
 The R script code was developed by dr. F. Brandolini (Newcastle University, UK) to accompany the paper: "Brandolini F.,  Turner S.,  - Revealing patterns and connections in the historic landscape of the northern Apennines (Vetto, Italy)", submitted to the Journal of Maps.
 
-Abstract
+*Abstract*
 
 In the Northern Apennines, significant modifications to the characteristic historic features of landscapes occurred since the 1950s as agriculture declined in importance and villages were progressively depopulated. Today European and national policies are promoting the repopulation of these regions in order to help preserve the cultural identity of territories and to reduce demographic pressure in urban areas. Such initiatives increase the need for cultural and natural landscape management to be better integrated using interdisciplinary approaches. Sustainable landscape management is a dynamic process involving the formulation of a set of strategies to underpin the preservation of landscape heritage and to foster local development on the basis of the values and opportunities provided by landscapes themselves. This study uses landscape archaeology and spatial statistics to provide insights into which parts of the historic landscape retain the greatest time-depth and which parts reflect more recent radical change, enabling an understanding which goes beyond the basic spatial relationships between landscape components.
 
