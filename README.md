@@ -10,7 +10,7 @@ In the Northern Apennines, significant modifications to the characteristic histo
 
 This dataset was explored with two spatial statistical tools using the programming language R (R Core Team 2021): Local Indicators for Categorical Data (LICD) and Point Pattern analysis (PPA). The LICD method is based on join-count statistics (JCS), a solid method to measure the correlation between binomial variables and the distance between observations. 
   LICD has been recently employed in landscape archaeological studies for verifying visible patterns and disclosing hidden spatial relationships (article: Carrer et al. 2021: https://doi.org/10.1016/j.jas.2020.105306, Data: [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4283767.svg)](https://doi.org/10.5281/zenodo.4283767)). 
-  The application of PPA in landscape studies has been widely applied in Ecology and it is growing popular also in Archaeology (Knitter and Nakoinz 2018; Brandolini and Carrer 2020; Costanzo et al. 2021). In this study, PPA was employed to provide a quantitative assessment of the correlations between different components of the Vetto landscape.
+  The application of PPA in landscape studies has been widely applied in Ecology and it is growing popular also in Archaeology (Knitter and Nakoinz 2018: https://link.springer.com/chapter/10.1007/978-3-319-25316-9_4; Brandolini and Carrer 2020: https://doi.org/10.1080/14614103.2020.1740866; Costanzo et al. 2021: https://doi.org/10.1371/journal.pone.0253511). In this study, PPA was employed to provide a quantitative assessment of the correlations between different components of the Vetto landscape.
 
 ## Dataset & R Script Code
 
